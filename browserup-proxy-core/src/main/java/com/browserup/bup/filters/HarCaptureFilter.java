@@ -4,36 +4,25 @@
 
 package com.browserup.bup.filters;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.io.BaseEncoding;
-import com.browserup.harreader.model.HarHeader;
-import com.browserup.harreader.model.HttpMethod;
-import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpHeaders;
-import io.netty.handler.codec.http.HttpObject;
-import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponse;
-import io.netty.handler.codec.http.LastHttpContent;
-import io.netty.handler.codec.http.QueryStringDecoder;
-import io.netty.handler.codec.http.cookie.ClientCookieDecoder;
-import io.netty.handler.codec.http.cookie.Cookie;
-import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
-import com.browserup.harreader.model.Har;
-import com.browserup.harreader.model.HarCookie;
-import com.browserup.harreader.model.HarEntry;
-import com.browserup.harreader.model.HarQueryParam;
-import com.browserup.harreader.model.HarPostData;
-import com.browserup.harreader.model.HarPostDataParam;
-import com.browserup.harreader.model.HarRequest;
-import com.browserup.harreader.model.HarResponse;
 import com.browserup.bup.exception.UnsupportedCharsetException;
 import com.browserup.bup.filters.support.HttpConnectTiming;
 import com.browserup.bup.filters.util.HarCaptureUtil;
 import com.browserup.bup.proxy.CaptureType;
 import com.browserup.bup.util.BrowserUpHttpUtil;
+import com.browserup.harreader.model.HttpMethod;
+import com.browserup.harreader.model.*;
+import com.google.common.collect.ImmutableList;
+import com.google.common.io.BaseEncoding;
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelDuplexHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPromise;
+import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.cookie.ClientCookieDecoder;
+import io.netty.handler.codec.http.cookie.Cookie;
+import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
+import io.netty.handler.codec.http.websocketx.*;
+import io.netty.util.CharsetUtil;
 import org.littleshoot.proxy.impl.ProxyUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,19 +31,43 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.browserup.bup.util.BrowserUpProxyUtil.getTotalElapsedTime;
 import static java.util.concurrent.TimeUnit.*;
 
 public class HarCaptureFilter extends HttpsAwareFiltersAdapter {
-    private static final Logger log = LoggerFactory.getLogger(HarCaptureFilter.class);
+    private static final Logger log                       = LoggerFactory.getLogger(HarCaptureFilter.class);
+    private static final String WEB_SOCKET_MESSAGES       = "_webSocketMessages";
+    private static final String WEB_SOCKET_SEND           = "send";
+    private static final String WEB_SOCKET_RECEIVE        = "receive";
+    public static final  String WEBSOCKET_HAR_HANDLE_NAME = "websocketHar";
+
+    /**
+     * |Opcode  | Meaning                             | Reference |
+     * -+--------+-------------------------------------+-----------|
+     * | 0      | Continuation Frame                  | RFC 6455  |
+     * -+--------+-------------------------------------+-----------|
+     * | 1      | Text Frame                          | RFC 6455  |
+     * -+--------+-------------------------------------+-----------|
+     * | 2      | Binary Frame                        | RFC 6455  |
+     * -+--------+-------------------------------------+-----------|
+     * | 8      | Connection Close Frame              | RFC 6455  |
+     * -+--------+-------------------------------------+-----------|
+     * | 9      | Ping Frame                          | RFC 6455  |
+     * -+--------+-------------------------------------+-----------|
+     * | 10     | Pong Frame                          | RFC 6455  |
+     * -+--------+-------------------------------------+-----------|
+     **/
+    private static Map<Class<? extends WebSocketFrame>, Integer> websocketOpCode = new HashMap<Class<? extends WebSocketFrame>, Integer>() {{
+        put(ContinuationWebSocketFrame.class, 0);
+        put(TextWebSocketFrame.class, 1);
+        put(BinaryWebSocketFrame.class, 2);
+        put(CloseWebSocketFrame.class, 8);
+        put(PingWebSocketFrame.class, 9);
+        put(PongWebSocketFrame.class, 10);
+    }};
 
     /**
      * The currently active HAR at the time the current request is received.
@@ -126,6 +139,36 @@ public class HarCaptureFilter extends HttpsAwareFiltersAdapter {
      */
     private volatile boolean addressResolved = false;
 
+    private static class WebsocketEntry {
+        private final String type;
+        private final long   time;
+        private final int    opcode;
+        private final String data;
+
+        public WebsocketEntry(String type, long time, int opcode, String data) {
+            this.type = type;
+            this.time = time;
+            this.opcode = opcode;
+            this.data = data;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public long getTime() {
+            return time;
+        }
+
+        public int getOpcode() {
+            return opcode;
+        }
+
+        public String getData() {
+            return data;
+        }
+    }
+
     /**
      * Create a new instance of the HarCaptureFilter that will capture request and response information. If no har is specified in the
      * constructor, this filter will do nothing.
@@ -181,6 +224,42 @@ public class HarCaptureFilter extends HttpsAwareFiltersAdapter {
 
         this.harEntry = new HarEntry();
         this.harEntry.setPageref(currentPageRef);
+
+        if (!this.ctx.pipeline().toMap().containsKey(WEBSOCKET_HAR_HANDLE_NAME)) {
+
+            // we rely on the websocket handler, I know that it is ugly but...
+            // relying on the current architecture could mean lots of code and design changes
+            // so this could be a temporary and minimal solution
+            this.ctx.pipeline().addAfter("websocket", WEBSOCKET_HAR_HANDLE_NAME, new ChannelDuplexHandler() {
+                @Override
+                public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                    if (msg instanceof WebSocketFrame) {
+                        if (!harEntry.getAdditional().containsKey(WEB_SOCKET_MESSAGES)) {
+                            harEntry.setAdditionalField(WEB_SOCKET_MESSAGES, new ArrayList<WebsocketEntry>());
+                        }
+
+                        List<WebsocketEntry> websocketEntries = (List<WebsocketEntry>) harEntry.getAdditional().get(WEB_SOCKET_MESSAGES);
+                        websocketEntries.add(buildWebsocketEntry(WEB_SOCKET_SEND, (WebSocketFrame) msg));
+
+                    }
+                    super.channelRead(ctx, msg);
+                }
+
+                @Override
+                public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
+                    if (msg instanceof WebSocketFrame) {
+                        if (!harEntry.getAdditional().containsKey(WEB_SOCKET_MESSAGES)) {
+                            harEntry.setAdditionalField(WEB_SOCKET_MESSAGES, new ArrayList<WebsocketEntry>());
+                        }
+
+                        List<WebsocketEntry> websocketEntries = (List<WebsocketEntry>) harEntry.getAdditional().get(WEB_SOCKET_MESSAGES);
+                        websocketEntries.add(buildWebsocketEntry(WEB_SOCKET_RECEIVE, (WebSocketFrame) msg));
+                    }
+
+                    super.write(ctx, msg, promise);
+                }
+            });
+        }
     }
 
     @Override
@@ -791,5 +870,9 @@ public class HarCaptureFilter extends HttpsAwareFiltersAdapter {
         } else {
             this.harEntry.getTimings().setReceive(0);
         }
+    }
+
+    private static WebsocketEntry buildWebsocketEntry(String type, WebSocketFrame webSocketFrame) {
+        return new WebsocketEntry(type, System.currentTimeMillis(), websocketOpCode.get(webSocketFrame.getClass()), webSocketFrame.content().toString(CharsetUtil.UTF_8));
     }
 }
