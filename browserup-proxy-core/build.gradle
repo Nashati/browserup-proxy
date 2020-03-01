@@ -9,48 +9,23 @@ plugins {
 
 archivesBaseName = 'browserup-proxy-core'
 
+apply plugin: "maven"
+
+configurations {
+    deployerJars
+}
+
 uploadArchives {
     repositories {
         mavenDeployer {
-            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+            configuration = configurations.deployerJars
 
-            if (project.hasProperty("ossrhUsername") && project.hasProperty("ossrhPassword")) {
-                repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
-                    authentication(userName: ossrhUsername, password: ossrhPassword)
-                }
-
-                snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
-                    authentication(userName: ossrhUsername, password: ossrhPassword)
-                }
+            repository(url: "http://aws-nexus:8081/nexus/content/repositories/releases") {
+                authentication(userName: mavenUser, password: mavenPassword)
             }
 
-            pom.project {
-                name 'browserup-proxy-core'
-                description 'BrowserUp Proxy - Core'
-                url 'https://github.com/browserup/browserup-proxy'
-                packaging 'jar'
-
-                scm {
-                    connection 'scm:git:git@github.com:browserup/browserup-proxy.git'
-                    developerConnection 'scm:git:git@github.com:browserup/browserup-proxy.git'
-                    url 'https://github.com/browserup/browserup-proxy/tree/master/browserup-proxy-core'
-                }
-
-                licenses {
-                    license {
-                        name 'The Apache Software License, Version 2.0'
-                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-                        distribution 'repo'
-                    }
-                }
-
-                developers {
-                    developer {
-                        id 'browserup'
-                        name 'BrowserUp, Inc.'
-                        email 'developers@browserup.com'
-                    }
-                }
+            snapshotRepository(url: "http://aws-nexus:8081/nexus/content/repositories/snapshots") {
+                authentication(userName: mavenUser, password: mavenPassword)
             }
         }
     }
@@ -88,10 +63,11 @@ dependencies {
     testImplementation "org.eclipse.jetty:jetty-server:${jettyVersion}"
     testImplementation "org.eclipse.jetty:jetty-servlet:${jettyVersion}"
     testImplementation "org.eclipse.jetty:jetty-servlets:${jettyVersion}"
-    testImplementation 'org.hamcrest:hamcrest:2.2'    
+    testImplementation 'org.hamcrest:hamcrest:2.2'
     testImplementation 'org.hamcrest:hamcrest-library:2.2'
     testImplementation 'com.github.tomakehurst:wiremock-jre8:2.24.1'
     testImplementation 'org.mockito:mockito-core:3.2.4'
     testImplementation 'org.seleniumhq.selenium:selenium-firefox-driver:3.141.59'
     testImplementation 'org.apache.httpcomponents:httpclient:4.5.10'
 }
+
