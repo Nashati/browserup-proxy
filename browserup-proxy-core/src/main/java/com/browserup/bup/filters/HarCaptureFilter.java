@@ -38,11 +38,12 @@ import static com.browserup.bup.util.BrowserUpProxyUtil.getTotalElapsedTime;
 import static java.util.concurrent.TimeUnit.*;
 
 public class HarCaptureFilter extends HttpsAwareFiltersAdapter {
-    private static final Logger log                       = LoggerFactory.getLogger(HarCaptureFilter.class);
-    private static final String WEB_SOCKET_MESSAGES       = "_webSocketMessages";
-    private static final String WEB_SOCKET_SEND           = "send";
-    private static final String WEB_SOCKET_RECEIVE        = "receive";
-    public static final  String WEBSOCKET_HAR_HANDLE_NAME = "websocketHar";
+    private static final Logger log                        = LoggerFactory.getLogger(HarCaptureFilter.class);
+    private static final String WEB_SOCKET_MESSAGES        = "_webSocketMessages";
+    private static final String WEB_SOCKET_SEND            = "send";
+    private static final String WEB_SOCKET_RECEIVE         = "receive";
+    private static final String WEBSOCKET_HAR_HANDLE_NAME  = "websocketHar";
+    private static final String EXISTING_WEBSOCKET_HANDLER = "websocket";
 
     /**
      * |Opcode  | Meaning                             | Reference |
@@ -174,17 +175,17 @@ public class HarCaptureFilter extends HttpsAwareFiltersAdapter {
      * constructor, this filter will do nothing.
      * Regardless of the CaptureTypes specified in <code>dataToCapture</code>, the HarCaptureFilter will always capture:
      * <ul>
-     *     <li>Request and response sizes</li>
-     *     <li>HTTP request and status lines</li>
-     *     <li>Page timing information</li>
+     * <li>Request and response sizes</li>
+     * <li>HTTP request and status lines</li>
+     * <li>Page timing information</li>
      * </ul>
      *
      * @param originalRequest the original HttpRequest from the HttpFiltersSource factory
-     * @param har a reference to the ProxyServer's current HAR file at the time this request is received (can be null if HAR capture is not required)
-     * @param currentPageRef the ProxyServer's currentPageRef at the time this request is received from the client
-     * @param dataToCapture the data types to capture for this request. null or empty set indicates only basic information will be
-     *                      captured (see {@link com.browserup.bup.proxy.CaptureType} for information on data collected for each CaptureType)
-     * @param ctx ChannelHandlerContext ctx
+     * @param har             a reference to the ProxyServer's current HAR file at the time this request is received (can be null if HAR capture is not required)
+     * @param currentPageRef  the ProxyServer's currentPageRef at the time this request is received from the client
+     * @param dataToCapture   the data types to capture for this request. null or empty set indicates only basic information will be
+     *                        captured (see {@link com.browserup.bup.proxy.CaptureType} for information on data collected for each CaptureType)
+     * @param ctx             ChannelHandlerContext ctx
      */
     public HarCaptureFilter(HttpRequest originalRequest, ChannelHandlerContext ctx, Har har, String currentPageRef, Set<CaptureType> dataToCapture) {
         super(originalRequest, ctx);
@@ -225,12 +226,13 @@ public class HarCaptureFilter extends HttpsAwareFiltersAdapter {
         this.harEntry = new HarEntry();
         this.harEntry.setPageref(currentPageRef);
 
-        if (!this.ctx.pipeline().toMap().containsKey(WEBSOCKET_HAR_HANDLE_NAME)) {
+        if (!this.ctx.pipeline().toMap().containsKey(WEBSOCKET_HAR_HANDLE_NAME) &&
+                this.ctx.pipeline().toMap().containsKey(EXISTING_WEBSOCKET_HANDLER)) {
 
             // we rely on the websocket handler, I know that it is ugly but...
             // relying on the current architecture could mean lots of code and design changes
             // so this could be a temporary and minimal solution
-            this.ctx.pipeline().addAfter("websocket", WEBSOCKET_HAR_HANDLE_NAME, new ChannelDuplexHandler() {
+            this.ctx.pipeline().addAfter(EXISTING_WEBSOCKET_HANDLER, WEBSOCKET_HAR_HANDLE_NAME, new ChannelDuplexHandler() {
                 @Override
                 public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
                     if (msg instanceof WebSocketFrame) {
@@ -326,7 +328,7 @@ public class HarCaptureFilter extends HttpsAwareFiltersAdapter {
                 captureRequestContent(this.requestCaptureFilter.getHttpRequest(), this.requestCaptureFilter.getFullRequestContents());
             }
 
-            this.harEntry.getRequest().setBodySize((long)(this.requestBodySize.get()));
+            this.harEntry.getRequest().setBodySize((long) (this.requestBodySize.get()));
         }
 
         return null;
@@ -357,7 +359,7 @@ public class HarCaptureFilter extends HttpsAwareFiltersAdapter {
                 captureResponseContent(responseCaptureFilter.getHttpResponse(), responseCaptureFilter.getFullResponseContents());
             }
 
-            harEntry.getResponse().setBodySize((long)(responseBodySize.get()));
+            harEntry.getResponse().setBodySize((long) (responseBodySize.get()));
         }
 
         this.harEntry.setTime(getTotalElapsedTime(this.harEntry.getTimings()));
@@ -371,7 +373,7 @@ public class HarCaptureFilter extends HttpsAwareFiltersAdapter {
         HarResponse response = HarCaptureUtil.createHarResponseForFailure();
         harEntry.setResponse(response);
 
-        response.setAdditionalField ("_errorMessage", HarCaptureUtil.getResponseTimedOutErrorMessage());
+        response.setAdditionalField("_errorMessage", HarCaptureUtil.getResponseTimedOutErrorMessage());
 
 
         // include this timeout time in the HarTimings object
@@ -504,7 +506,7 @@ public class HarCaptureFilter extends HttpsAwareFiltersAdapter {
 
         Charset charset;
         try {
-             charset = BrowserUpHttpUtil.readCharsetInContentTypeHeader(contentType);
+            charset = BrowserUpHttpUtil.readCharsetInContentTypeHeader(contentType);
         } catch (UnsupportedCharsetException e) {
             log.warn("Found unsupported character set in Content-Type header '{}' in HTTP request to {}. Content will not be captured in HAR.", contentType, httpRequest.uri(), e);
             return;
@@ -580,7 +582,7 @@ public class HarCaptureFilter extends HttpsAwareFiltersAdapter {
             harEntry.getResponse().getContent().setEncoding("base64");
         }
 
-        harEntry.getResponse().getContent().setSize((long)fullMessage.length);
+        harEntry.getResponse().getContent().setSize((long) fullMessage.length);
     }
 
     protected void captureResponse(HttpResponse httpResponse) {
@@ -677,8 +679,7 @@ public class HarCaptureFilter extends HttpsAwareFiltersAdapter {
         String locationHeaderValue = HttpHeaders.getHeader(httpResponse, HttpHeaderNames.LOCATION);
         if (locationHeaderValue != null) {
             harEntry.getResponse().setRedirectURL(locationHeaderValue);
-        }
-        else {
+        } else {
             harEntry.getResponse().setRedirectURL("");
         }
     }
