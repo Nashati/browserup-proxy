@@ -9,15 +9,11 @@ import com.browserup.bup.BrowserUpProxyServer
 import com.browserup.bup.proxy.test.util.MockServerTest
 import com.browserup.bup.proxy.test.util.NewProxyServerTestUtil
 import org.apache.http.client.methods.HttpGet
-import org.apache.http.conn.HttpHostConnectException
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
 
-import static com.github.tomakehurst.wiremock.client.WireMock.get
-import static com.github.tomakehurst.wiremock.client.WireMock.ok
-import static com.github.tomakehurst.wiremock.client.WireMock.stubFor
-import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
+import static com.github.tomakehurst.wiremock.client.WireMock.*
 import static org.junit.Assert.assertEquals
 import static org.junit.Assume.assumeNoException
 
@@ -50,7 +46,7 @@ class BindAddressTest extends MockServerTest {
         }
     }
 
-    @Test(expected = HttpHostConnectException.class)
+    @Test(expected = RuntimeException.class)
     void testClientBindAddressCannotConnect() {
         def stubUrl = "/clientbind"
         stubFor(get(urlEqualTo(stubUrl)).willReturn(ok().withBody("success")))

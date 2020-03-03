@@ -9,8 +9,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.net.Inet4Address;
 import java.net.Inet6Address;
@@ -19,10 +17,7 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Collection;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 import static org.junit.Assume.assumeTrue;
 
 @RunWith(Parameterized.class)
@@ -72,7 +67,7 @@ public class AdvancedHostResolverTest {
 
         assertNotNull("Collection of resolved addresses should never be null", noAddresses);
 
-        assertEquals("Expected to find no address for www.notarealaddress.grenyarnia", 0, noAddresses.size());
+        assertEquals("Expected to find no address for www.notarealaddress.grenyarnia, got " + noAddresses, 0, noAddresses.size());
     }
 
     @Test
@@ -171,7 +166,7 @@ public class AdvancedHostResolverTest {
         resolver.remapHost("www.google.com", "www.notarealaddress");
 
         Collection<InetAddress> remappedAddresses = resolver.resolve("www.google.com");
-        assertEquals("Expected to find no address for remapped www.google.com", 0, remappedAddresses.size());
+        assertEquals("Expected to find no address for remapped www.google.com, got " + remappedAddresses, 0, remappedAddresses.size());
 
         resolver.removeHostRemapping("www.google.com");
 
@@ -185,7 +180,7 @@ public class AdvancedHostResolverTest {
         resolver.remapHost("www.google.com", "www.notarealaddress");
 
         Collection<InetAddress> remappedAddresses = resolver.resolve("www.google.com");
-        assertEquals("Expected to find no address for remapped www.google.com", 0, remappedAddresses.size());
+        assertEquals("Expected to find no address for remapped www.google.com, got " + remappedAddresses, 0, remappedAddresses.size());
 
         resolver.clearHostRemappings();
 
