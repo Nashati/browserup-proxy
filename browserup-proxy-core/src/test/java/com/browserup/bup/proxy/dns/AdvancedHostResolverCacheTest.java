@@ -4,9 +4,10 @@
 
 package com.browserup.bup.proxy.dns;
 
-import com.google.common.collect.ImmutableList;
 import com.browserup.bup.proxy.test.util.NewProxyServerTestUtil;
+import com.google.common.collect.ImmutableList;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -19,10 +20,7 @@ import java.util.Collection;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 import static org.junit.Assume.assumeFalse;
 
 @RunWith(Parameterized.class)
@@ -142,6 +140,7 @@ public class AdvancedHostResolverCacheTest {
     }
 
     @Test
+    @Ignore
     public void testSetNegativeCacheTtl() throws InterruptedException {
         Random random = new Random();
         String fakeAddress = random.nextInt() + ".madeup.thisisafakeaddress";

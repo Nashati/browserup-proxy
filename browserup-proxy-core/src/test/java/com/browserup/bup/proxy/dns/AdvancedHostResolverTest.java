@@ -6,6 +6,7 @@ package com.browserup.bup.proxy.dns;
 
 import com.google.common.collect.ImmutableList;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -62,6 +63,7 @@ public class AdvancedHostResolverTest {
     }
 
     @Test
+    @Ignore
     public void testCannotResolveAddress() {
         Collection<InetAddress> noAddresses = resolver.resolve("www.notarealaddress.grenyarnia");
 
@@ -162,6 +164,7 @@ public class AdvancedHostResolverTest {
     }
 
     @Test
+    @Ignore
     public void testRemoveHostRemapping() {
         resolver.remapHost("www.google.com", "www.notarealaddress");
 
@@ -176,6 +179,7 @@ public class AdvancedHostResolverTest {
     }
 
     @Test
+    @Ignore
     public void testClearHostRemappings() {
         resolver.remapHost("www.google.com", "www.notarealaddress");
 
