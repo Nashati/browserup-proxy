@@ -40,7 +40,7 @@ dependencies {
     implementation 'io.netty:netty-codec:4.1.44.Final'
     implementation "org.slf4j:jcl-over-slf4j:${slf4jVersion}"
     implementation "org.slf4j:slf4j-api:${slf4jVersion}"
-    implementation 'xyz.rogfam:littleproxy:2.0.0-beta-5'
+    implementation 'xyz.rogfam:littleproxy:1.0.18-SNAPSHOT'
 
     testImplementation "com.fasterxml.jackson.core:jackson-annotations:${jacksonVersion}"
     testImplementation "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}"
