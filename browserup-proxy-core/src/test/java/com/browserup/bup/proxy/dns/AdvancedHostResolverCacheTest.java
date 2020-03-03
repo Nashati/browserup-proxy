@@ -169,6 +169,7 @@ public class AdvancedHostResolverCacheTest {
     }
 
     @Test
+    @Ignore
     public void testSetEternalNegativeCacheTtl() {
         Random random = new Random();
         String fakeAddress = random.nextInt() + ".madeup.thisisafakeaddress";
