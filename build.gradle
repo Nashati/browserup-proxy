@@ -40,11 +40,8 @@ subprojects {
     }
 
     repositories {
-        jcenter()
-        mavenCentral()
-        maven { url("http://aws-nexus:8081/nexus/content/groups/public") }
-        maven { url "https://oss.sonatype.org/content/repositories/snapshots/" }
-        maven { url "https://oss.sonatype.org/service/local/staging/deploy/maven2/" }
+        mavenLocal()
+        maven { url("http://nexus-web.aws-dev.perfectomobile.com:8081/nexus/content/groups/public/") }
     }
 
     task javadocJar(type: Jar) {

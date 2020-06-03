@@ -20,11 +20,7 @@ uploadArchives {
         mavenDeployer {
             configuration = configurations.deployerJars
 
-            repository(url: "http://aws-nexus:8081/nexus/content/repositories/releases") {
-                authentication(userName: mavenUser, password: mavenPassword)
-            }
-
-            snapshotRepository(url: "http://aws-nexus:8081/nexus/content/repositories/snapshots") {
+            repository(url: "http://nexus-web.aws-dev.perfectomobile.com:8081/nexus/content/repositories/releases") {
                 authentication(userName: mavenUser, password: mavenPassword)
             }
         }
@@ -33,7 +29,7 @@ uploadArchives {
 
 dependencies {
     api 'io.netty:netty-codec:4.1.44.Final'
-    api 'xyz.rogfam:littleproxy:1.0.18-SNAPSHOT'
+    api 'xyz.rogfam:littleproxy:1.0.22'
 
     implementation project(':browserup-proxy-mitm')
 
